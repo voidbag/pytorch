@@ -24,7 +24,7 @@ namespace at::native {
 
 namespace {
 
-template <typename func_t>
+template <typename idx_scalar_t, typename func_t>
 void _dim_apply(
     const TensorBase &values,
     const TensorBase &indices,
@@ -56,7 +56,7 @@ void _dim_apply(
         for ([[maybe_unused]] const auto i : c10::irange(n)) {
           f(reinterpret_cast<scalar_t*>(values_data_bytes),
             values_dim_stride,
-            reinterpret_cast<int64_t*>(indices_data_bytes),
+            reinterpret_cast<idx_scalar_t*>(indices_data_bytes),
             indices_dim_stride,
             dim_size);
 
@@ -106,17 +106,18 @@ static bool can_use_radix_sort(const TensorBase& values, const bool descending) 
   return true;
 }
 
+template<typename idx_scalar_t>
 static void parallel_sort1d_kernel(
     const TensorBase& values,
     const TensorBase& indices) {
   AT_DISPATCH_INTEGRAL_TYPES(values.scalar_type(), "parallel_sort1d_kernel", [&] {
     const auto elements = values.numel();
     auto* const keys = values.data_ptr<scalar_t>();
-    auto* const vals = indices.data_ptr<int64_t>();
+    auto* const vals = indices.data_ptr<idx_scalar_t>();
     std::vector<scalar_t> tmp_keys(elements);
-    std::vector<int64_t> tmp_vals(elements);
+    std::vector<idx_scalar_t> tmp_vals(elements);
     const scalar_t* sorted_keys = nullptr;
-    const int64_t* sorted_vals = nullptr;
+    const idx_scalar_t* sorted_vals = nullptr;
     std::tie(sorted_keys, sorted_vals) = fbgemm::radix_sort_parallel(
         keys,
         vals,
@@ -132,7 +133,7 @@ static void parallel_sort1d_kernel(
       at::parallel_for(0, elements, elements / num_threads, [&](int64_t begin, int64_t end) {
         const auto job_size = end - begin;
         vec::map([](vec::Vectorized<scalar_t> x) -> vec::Vectorized<scalar_t> { return x; }, keys + begin, sorted_keys + begin, job_size);
-        vec::map([](vec::Vectorized<int64_t> x) -> vec::Vectorized<int64_t> { return x; }, vals + begin, sorted_vals + begin, job_size);
+        vec::map([](vec::Vectorized<idx_scalar_t> x) -> vec::Vectorized<idx_scalar_t> { return x; }, vals + begin, sorted_vals + begin, job_size);
       });
     }
   });
@@ -179,47 +180,50 @@ static void sort_kernel(
     // https://github.com/pytorch/pytorch/issues/91420
     return;
   }
+
+  AT_DISPATCH_UNSIGNED_INTEGRAL_TYPES(indices.scalar_type(), "sort_kernel", [&] {
 #ifdef USE_FBGEMM
-  if (can_use_radix_sort(values, descending)) {
-    parallel_sort1d_kernel(values, indices);
-    return;
-  }
-#endif
-  _dim_apply(
-    values, indices, dim,
-    "sort_cpu", [&](
-      auto* values, int64_t values_dim_stride,
-      auto* indices, int64_t indices_dim_stride,
-      int64_t dim_size
-    ) {
-      using scalar_t = std::remove_pointer_t<decltype(values)>;
-      if (values_dim_stride == 1 && indices_dim_stride == 1) {
-        sort_kernel_impl<
-          scalar_t, decltype(values), decltype(indices)
-        >(values, indices, dim_size, descending, stable);
-      } else if (values_dim_stride == 1 && indices_dim_stride != 1) {
-        auto indices_accessor = StridedRandomAccessor<int64_t>(
-          indices, indices_dim_stride);
-        sort_kernel_impl<
-          scalar_t, decltype(values), decltype(indices_accessor)
-        >(values, indices_accessor, dim_size, descending, stable);
-      } else if (values_dim_stride != 1 && indices_dim_stride == 1) {
-        auto values_accessor = StridedRandomAccessor<scalar_t>(
-          values, values_dim_stride);
-        sort_kernel_impl<
-          scalar_t, decltype(values_accessor), decltype(indices)
-        >(values_accessor, indices, dim_size, descending, stable);
-      } else {
-        auto values_accessor = StridedRandomAccessor<scalar_t>(
-          values, values_dim_stride);
-        auto indices_accessor = StridedRandomAccessor<int64_t>(
-          indices, indices_dim_stride);
-        sort_kernel_impl<
-          scalar_t, decltype(values_accessor), decltype(indices_accessor)
-        >(values_accessor, indices_accessor, dim_size, descending, stable);
-      }
+    if (can_use_radix_sort(values, descending)) {
+      parallel_sort1d_kernel<scalar_t>(values, indices);
+      return;
     }
-  );
+#endif
+    _dim_apply<scalar_t>(
+      values, indices, dim,
+      "sort_cpu", [&](
+        auto* values, int64_t values_dim_stride,
+        auto* indices, int64_t indices_dim_stride,
+        int64_t dim_size
+      ) {
+        using val_scalar_t = std::remove_pointer_t<decltype(values)>;
+        if (values_dim_stride == 1 && indices_dim_stride == 1) {
+          sort_kernel_impl<
+            val_scalar_t, decltype(values), decltype(indices)
+          >(values, indices, dim_size, descending, stable);
+        } else if (values_dim_stride == 1 && indices_dim_stride != 1) {
+          auto indices_accessor = StridedRandomAccessor<scalar_t>(
+            indices, indices_dim_stride);
+          sort_kernel_impl<
+            val_scalar_t, decltype(values), decltype(indices_accessor)
+          >(values, indices_accessor, dim_size, descending, stable);
+        } else if (values_dim_stride != 1 && indices_dim_stride == 1) {
+          auto values_accessor = StridedRandomAccessor<val_scalar_t>(
+            values, values_dim_stride);
+          sort_kernel_impl<
+            val_scalar_t, decltype(values_accessor), decltype(indices)
+          >(values_accessor, indices, dim_size, descending, stable);
+        } else {
+          auto values_accessor = StridedRandomAccessor<val_scalar_t>(
+            values, values_dim_stride);
+          auto indices_accessor = StridedRandomAccessor<scalar_t>(
+            indices, indices_dim_stride);
+          sort_kernel_impl<
+            val_scalar_t, decltype(values_accessor), decltype(indices_accessor)
+          >(values_accessor, indices_accessor, dim_size, descending, stable);
+        }
+      }
+    );
+  });
 }
 
 static void topk_kernel(
