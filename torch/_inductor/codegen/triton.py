@@ -7296,6 +7296,7 @@ class TritonKernel(SIMDKernel[TritonCSEVariable]):
         values: tuple[CSEVariable, ...],
         stable: bool,
         descending: bool,
+        dynamic_indices_type: bool = False,
     ) -> tuple[CSEVariable, ...]:
         if not self.inside_reduction:
             raise AssertionError("expected inside_reduction")

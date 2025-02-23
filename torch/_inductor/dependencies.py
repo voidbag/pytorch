@@ -926,6 +926,7 @@ class FreeSymbolsOpsHandler(DefaultHandler):
         values: Sequence[object],
         stable: bool,
         descending: bool,
+        dynamic_indices_type: bool = False,
     ) -> tuple[None, ...]:
         return (None,) * len(values)
 
