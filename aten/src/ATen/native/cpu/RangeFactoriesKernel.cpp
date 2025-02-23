@@ -3,6 +3,7 @@
 #include <cmath>
 #include <ATen/Config.h>
 #include <ATen/Dispatch.h>
+#include <ATen/Dispatch_v2.h>
 #include <ATen/native/DispatchStub.h>
 
 #include <ATen/AccumulateType.h>
@@ -62,7 +63,7 @@ void arange_kernel(TensorIterator& iter, const Scalar& scalar_start, const Scala
 }
 
 void linspace_kernel(TensorIterator& iter, const Scalar& scalar_start, const Scalar& scalar_end, int64_t steps) {
-  AT_DISPATCH_ALL_TYPES_AND_COMPLEX_AND2(kHalf, kBFloat16, iter.dtype(), "linspace_cpu", [&]() {
+  AT_DISPATCH_V2(iter.dtype(), "linspace_cpu", AT_WRAP([&] {
     // step should be of double type for all integral types, and of the opmath
     // type for reduced-precision floats: rounding step to half or bfloat16 and
     // then multiplying by the index compounds that rounding across the range.
@@ -89,7 +90,7 @@ void linspace_kernel(TensorIterator& iter, const Scalar& scalar_start, const Sca
             }
           }, {p_begin, p_end});
     });
-  });
+  }), AT_EXPAND(AT_ALL_TYPES_AND_COMPLEX), AT_EXPAND(AT_BAREBONES_UNSIGNED_TYPES), kHalf, kBFloat16);
 }
 
 } // anonymous namespace
