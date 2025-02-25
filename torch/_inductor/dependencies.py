@@ -926,7 +926,8 @@ class FreeSymbolsOpsHandler(DefaultHandler):
         values: Sequence[object],
         stable: bool,
         descending: bool,
-        dynamic_indices_type: bool = False,
+        indices_dtype: torch.dtype,
+        dynamic_indices_dtype: bool,
     ) -> tuple[None, ...]:
         return (None,) * len(values)
 
