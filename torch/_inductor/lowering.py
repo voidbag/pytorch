@@ -8338,15 +8338,7 @@ sort_fallback = fallback_handler(aten.sort.stable, add_to_fallback_set=False)
 
 
 @register_lowering(aten.sort.stable, type_promotion_kind=None)
-def sort_stable(
-    x,
-    *,
-    stable=None,
-    dim=-1,
-    descending=False,
-    indices_dtype=torch.long,
-    dynamic_indices_dtype=False,
-):
+def sort_stable(x, *, stable=None, dim=-1, descending=False):
     if stable is None:
         stable = False
 
@@ -8367,14 +8359,7 @@ def sort_stable(
     if not V.graph.sizevars.guard_or_false(
         sympy.Lt(dim_size, torch.iinfo(idx_dtype).max)
     ):
-        return sort_fallback(
-            x,
-            stable=stable,
-            dim=dim,
-            descending=descending,
-            indices_dtype=indices_dtype,
-            dynamic_indices_dtype=False,
-        )
+        return sort_fallback(x, stable=stable, dim=dim, descending=descending)
 
     indices = iota(
         dim_size, start=0, step=1, dtype=idx_dtype, device=device, requires_grad=False
@@ -8393,18 +8378,9 @@ def sort_stable(
         axis=dim,
         stable=stable,
         descending=descending,
-        indices_dtype=indices_dtype,
-        dynamic_indices_dtype=dynamic_indices_dtype,
     )
     if values is None:
-        return sort_fallback(
-            x,
-            stable=stable,
-            dim=dim,
-            descending=descending,
-            indices_dtype=indices_dtype,
-            dynamic_indices_dtype=dynamic_indices_dtype,
-        )
+        return sort_fallback(x, stable=stable, dim=dim, descending=descending)
 
     if indices is None:
         raise AssertionError("expected: indices is not None")
@@ -8412,17 +8388,8 @@ def sort_stable(
 
 
 @register_lowering(aten.sort.default, type_promotion_kind=None)
-def sort(
-    x, dim=-1, descending=False, indices_dtype=torch.long, dynamic_indices_dtype=False
-):
-    return sort_stable(
-        x,
-        stable=False,
-        dim=dim,
-        descending=descending,
-        indices_dtype=indices_dtype,
-        dynamic_indices_dtype=dynamic_indices_dtype,
-    )
+def sort(x, dim=-1, descending=False):
+    return sort_stable(x, stable=False, dim=dim, descending=descending)
 
 
 # Sort-based op lowerings
