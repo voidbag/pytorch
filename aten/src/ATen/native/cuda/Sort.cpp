@@ -10,7 +10,7 @@
 #include <ATen/Functions.h>
 #include <ATen/NativeFunctions.h>
 #else
-#include <ATen/ops/linspace.h>
+#include <ATen/ops/arange.h>
 #include <ATen/ops/empty_strided.h>
 #include <ATen/ops/sort_native.h>
 #endif
@@ -23,7 +23,7 @@ void fillSliceWithIndex(const Tensor& t, int64_t dim) {
   if (t.numel()) {
     auto sizes = DimVector(t.dim(), 1);
     sizes[dim] = t.sizes()[dim];
-    auto range = at::linspace(0, t.sizes()[dim] - 1, t.sizes()[dim], t.options());
+    auto range = at::arange(t.sizes()[dim], t.options());
     auto rangeview = range.view(sizes);
     t.copy_(rangeview);
   }
