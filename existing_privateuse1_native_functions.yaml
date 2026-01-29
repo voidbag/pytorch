@@ -1,0 +1,8 @@
+backend: PrivateUse1
+cpp_namespace: priv1::native  # Max level was 2
+use_out_as_primary: false     # Assert failure if true
+device_guard: false           # Assert failure if true
+supported:
+  - sub.Tensor                # Generates out-variant and inplace op with unnecessary copy
+  - mul.Tensor                # Generates out-variant and inplace op with unnecessary copy
+  - div.out                   # No functional/inplace auto-generation

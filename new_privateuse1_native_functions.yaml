@@ -1,0 +1,13 @@
+backend: PrivateUse1
+cpp_namespace: at::priv1::native  # Deeper namespace support
+use_out_as_primary: true          # Enable zero-copy redirection
+device_guard: true                # Automated DeviceGuard
+supported:
+  - sub.out:
+    structured: true.             # Use structured kernel format of native function 
+    ext_structured_meta: true.    # Use custom meta logic
+  - mul.out: 
+    structured: true              # Use structured kernel format of native function
+    ext_structured_meta: false    # Reuse TORCH_META_FUNC2(mul, Tenosr) (default: false)
+  - div.out:                      # use only out_as_primary, custom meta logic should be in TORCH_PRIV1_FUNC(div_out)
+    device_guard: false           # disable device guard for this op
