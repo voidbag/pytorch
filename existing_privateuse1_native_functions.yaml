@@ -1,0 +1,8 @@
+backend: PrivateUse1
+cpp_namespace: priv1::native  # Max level was 2 (no three-level namespace)
+use_out_as_primary: false     # legacy functional-primary path
+device_guard: false
+supported:
+  - sub.Tensor                # Generates out-variant and inplace op with a temp copy
+  - mul.Tensor                # Generates out-variant and inplace op with a temp copy
+  - div.out                   # No functional/inplace auto-generation
